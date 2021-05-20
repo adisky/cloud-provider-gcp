@@ -96,5 +96,7 @@ func GetResponse(image string, provider credentialconfig.DockerConfigProvider) (
 	}
 	response.TypeMeta.Kind = apiKind
 	response.TypeMeta.APIVersion = apiVersion
+	response.CacheKeyType = credentialproviderapi.RegistryPluginCacheKeyType
+
 	return response, nil
 }

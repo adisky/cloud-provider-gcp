@@ -24,6 +24,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+        "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubelet/pkg/apis/credentialprovider/install"
+
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/cloud-provider-gcp/cmd/auth-provider-gcp/provider"
@@ -37,6 +42,16 @@ const (
 	dockerConfigAuthFlow    = "dockercfg"
 	dockerConfigURLAuthFlow = "dockercfg-url"
 )
+
+
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	install.Install(scheme)
+}
 
 // CredentialOptions contains a representation of the options passed to the credential provider.
 type CredentialOptions struct {
@@ -125,11 +140,26 @@ func getCredentials(authFlow string) error {
 	if err != nil {
 		return fmt.Errorf("error getting authentication response from provider: %w", err)
 	}
+	/*
 	jsonResponse, err := json.Marshal(authCredentials)
 	if err != nil {
 		// The error from json.Marshal is intentionally not included so as to not leak credentials into the logs
 		return fmt.Errorf("error marshaling credentials")
+	}*/
+
+	mediaType := "application/json"
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return fmt.Errorf("unsupported media type %q", mediaType)
 	}
+
+	encoder := codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
+
+	jsonResponse, err := runtime.Encode(encoder, authCredentials)
+	if err != nil {
+		return fmt.Errorf("failed to encode response: %v", err)
+	}
+
 	// Emit authentication response for kubelet to consume
 	fmt.Println(string(jsonResponse))
 	return nil
